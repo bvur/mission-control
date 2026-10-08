@@ -524,7 +524,9 @@ function stepsReading(list: Step[]): string {
     : `${shorten(current.subject, 16)} · ${count}`
 }
 
-const PROGRESS_WIDTH = 720
+// The panel's inner width in the desktop app, so the block reaches its right
+// edge.
+const PROGRESS_WIDTH = 736
 const WAVE_BLOCKS = 48
 const WAVE_HEIGHT = 3
 
@@ -555,7 +557,7 @@ const ROW_COUNT = 5
 // Every step of a turn is kept, up to this many; the panel shows a window.
 const ROW_KEEP = 300
 const SPAN_COUNT = 200
-const ROW_EDGE = 670
+const ROW_EDGE = PROGRESS_WIDTH - 44
 
 // One step: its number, a box ticked once it is done, the tool's name and
 // what the call was for, and how long the step took. A drawing of its own, so
@@ -571,7 +573,7 @@ function rowSvg(
   const count = `<text x="20" y="12" text-anchor="end" fill-opacity="0.6" ${text}>${number}</text>`
   const box = `<rect x="27.5" y="3.5" width="9" height="9" rx="2" fill="none" class="b" stroke="${LINE}"/>`
   // The tool's name stands out from what the call was for.
-  const [tool = '', ...rest] = shorten(row.label, 84).split(' · ')
+  const [tool = '', ...rest] = shorten(row.label, 86).split(' · ')
   const words = rest.length > 0 ? ` · ${rest.join(' · ')}` : ''
   const label = `<text x="44" y="12" ${text}><tspan class="m" fill="${MINT}" font-weight="600">${escapeXml(tool)}</tspan>${escapeXml(words)}</text>`
   const open = `<svg xmlns="http://www.w3.org/2000/svg" width="${PROGRESS_WIDTH}" height="${ROW_HEIGHT}" viewBox="0 0 ${PROGRESS_WIDTH} ${ROW_HEIGHT}">${STYLE}${backdrop(PROGRESS_WIDTH, ROW_HEIGHT)}`
@@ -601,7 +603,7 @@ function rowSvg(
   )
 }
 
-const SHARE_TRACK = 240
+const SHARE_TRACK = 160
 
 // Once the turn is over the bar shows where its time went: one segment per
 // step, as wide as that step's share of the whole.
@@ -662,12 +664,25 @@ function progressSvg(
       ? SHARE_TRACK + 12
       : 0
   const height = ROW_HEIGHT
+  // The summary is cut where the conversation clock begins.
+  const clock =
+    session === null
+      ? 0
+      : 18 +
+        textWidth('Conversation time') +
+        8 +
+        clockWidth(FONT_SIZE, Math.floor(session / 1000)) +
+        12
+  const room = Math.max(
+    8,
+    Math.floor((width - clock - edge) / (FONT_SIZE * ADVANCE)),
+  )
 
   return (
     `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">${STYLE}${backdrop(width, height)}` +
     (running ? tickingClock(left - 10, 12, FONT_SIZE, seconds, 'm') : '') +
     bar +
-    `<text x="${edge}" y="12" class="${activityInk(now)}" font-family="${FONT}" font-size="${FONT_SIZE}">${escapeXml(progressReading(now, list, calls) + note)}</text>` +
+    `<text x="${edge}" y="12" class="${activityInk(now)}" font-family="${FONT}" font-size="${FONT_SIZE}">${escapeXml(shorten(progressReading(now, list, calls) + note, room))}</text>` +
     (session === null ? '' : sessionClock(session, width)) +
     `</svg>`
   )
@@ -1343,7 +1358,7 @@ export const register: Register = on => {
     const range =
       most === 0
         ? ''
-        : ` · steps ${shown[0]?.number ?? 0}–${shown.at(-1)?.number ?? 0} of ${numberOf(rows.at(-1) as Entry, rows.length - 1)}`
+        : ` · ${shown[0]?.number ?? 0}–${shown.at(-1)?.number ?? 0} of ${numberOf(rows.at(-1) as Entry, rows.length - 1)}`
     const pager =
       most === 0
         ? []
@@ -1456,7 +1471,7 @@ export const register: Register = on => {
     const patch = PATCH === '' ? {} : { backgroundColor: PATCH }
     const running = isRunning(current)
     // The paging buttons take their room from the summary.
-    const summaryWidth = PROGRESS_WIDTH - (pager.length === 0 ? 0 : 76)
+    const summaryWidth = PROGRESS_WIDTH - (pager.length === 0 ? 0 : 60)
     const spent = (journal.spans ?? []).reduce((sum, span) => sum + span, 0)
     const hostChip: Chip = { icon: isLocal ? 'laptop' : 'cloud', label: '' }
 
