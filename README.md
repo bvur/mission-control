@@ -96,4 +96,6 @@ claude plugin validate .
 claude plugin test .
 ```
 
-Icons are from [Lucide](https://lucide.dev) (ISC licence).
+## Licence
+
+[MIT](LICENSE). Icons are from [Lucide](https://lucide.dev) (ISC licence).
