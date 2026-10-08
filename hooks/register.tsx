@@ -1350,14 +1350,14 @@ export const register: Register = on => {
         : [
             <Button
               key="older"
-              label="▲ Earlier steps"
+              label="▲"
               onPress={() =>
                 update($, scroll, () => Math.min(most, back + ROW_COUNT - 1))
               }
             />,
             <Button
               key="newer"
-              label="▼ Later steps"
+              label="▼"
               onPress={() =>
                 update($, scroll, () => Math.max(0, back - (ROW_COUNT - 1)))
               }
@@ -1370,8 +1370,7 @@ export const register: Register = on => {
       : current.endedAt === null
         ? undefined
         : CACHE_MINUTES * 60_000 - (time - current.endedAt)
-    // Every control sits in one row under the panel, where the app's own
-    // button style matches what is behind it.
+    // The terminal's controls, worded; the desktop's sit inside the panel.
     const buttons = (
       <Box flexDirection="row" flexWrap="wrap" columnGap={1}>
         {name === null ? null : (
@@ -1452,7 +1451,12 @@ export const register: Register = on => {
     }
 
     const { Svg } = $.ui.resolve(e)
+    // A muted patch behind each of the app's buttons, which it styles for its
+    // own background, not the panel's.
+    const patch = PATCH === '' ? {} : { backgroundColor: PATCH }
     const running = isRunning(current)
+    // The paging buttons take their room from the summary.
+    const summaryWidth = PROGRESS_WIDTH - (pager.length === 0 ? 0 : 76)
     const spent = (journal.spans ?? []).reduce((sum, span) => sum + span, 0)
     const hostChip: Chip = { icon: isLocal ? 'laptop' : 'cloud', label: '' }
 
@@ -1479,16 +1483,19 @@ export const register: Register = on => {
               journal.spans ?? [],
               time,
               began === null || time <= 0 ? null : time - began,
-              PROGRESS_WIDTH,
+              summaryWidth,
               range,
             )}
             alt={[progressReading(current, tasks, calls) + range]
               .concat(elapsed === null ? [] : [`Conversation time ${elapsed}`])
               .join('; ')}
-            width={PROGRESS_WIDTH}
+            width={summaryWidth}
             height={ROW_HEIGHT}
             isInteractive
           />
+          {pager.map(button => (
+            <Box {...patch}>{button}</Box>
+          ))}
         </Box>
         {shown.map(each =>
           each.row.endedAt === null ? (
@@ -1516,14 +1523,27 @@ export const register: Register = on => {
             width={chipWidth(hostChip)}
             height={CHIP_HEIGHT + CHIP_GAP}
           />
-          {chips.map(chip => (
-            <Svg
-              source={chipSvg(chip)}
-              alt={chip.label === '' ? 'No worktree' : chip.label}
-              width={chipWidth(chip)}
-              height={CHIP_HEIGHT + CHIP_GAP}
-            />
-          ))}
+          {chips.flatMap(chip => {
+            const text = chip.copy
+
+            return [
+              <Svg
+                source={chipSvg(chip)}
+                alt={chip.label === '' ? 'No worktree' : chip.label}
+                width={chipWidth(chip)}
+                height={CHIP_HEIGHT + CHIP_GAP}
+              />,
+              text === undefined ? null : (
+                <Box {...patch}>
+                  <Button
+                    key={`copy-${chip.icon}`}
+                    label="⧉"
+                    onPress={() => copyText($, text, surface)}
+                  />
+                </Box>
+              ),
+            ]
+          })}
         </Box>
         <Box flexDirection="column">
           {bars.map((bar, index) => {
@@ -1546,6 +1566,15 @@ export const register: Register = on => {
                   isInteractive
                 />
               )}
+              {bar.label === 'Context' ? (
+                <Box {...patch}>
+                  <Button
+                    key="compact"
+                    label="⇲"
+                    onPress={() => compact($)}
+                  />
+                </Box>
+              ) : null}
               {bar.label === 'Cache' && remaining !== undefined ? (
                 <Svg
                   source={expirySvg(remaining)}
@@ -1555,14 +1584,14 @@ export const register: Register = on => {
                   isInteractive
                 />
               ) : null}
+              {index === bars.length - 1 ? <Box flexGrow={1} /> : null}
+              {index === bars.length - 1 ? (
+                <Box {...patch}>{themeSelect}</Box>
+              ) : null}
             </Box>
             )
           })}
         </Box>
-      </Box>
-      <Box flexDirection="row" justifyContent="space-between" columnGap={1}>
-        {buttons}
-        {themeSelect}
       </Box>
       </Box>
     )

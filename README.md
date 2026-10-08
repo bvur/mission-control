@@ -21,10 +21,10 @@ session is doing and what it is costing.
 
 ## Controls
 
-- A row of buttons under the panel: copy the session name, working directory or branch, and page through a long turn's steps.
-- A Compact button in the same row, which runs `/compact` once Claude
+- A copy button beside the session name, working directory and branch, and paging arrows beside the summary when a turn has more than five steps.
+- A compact button beside the Context bar, which runs `/compact` once Claude
   is idle.
-- A theme dropdown under the panel, on the right. The choice is remembered across
+- A theme dropdown in the bottom right corner. The choice is remembered across
   sessions. Themes: Forest, Midnight, Graphite, Paper, Ocean, Plum, Ember,
   Slate and Sand.
 
