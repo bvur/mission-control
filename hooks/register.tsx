@@ -545,7 +545,7 @@ function waveSvg(running: boolean, list: Step[]): string {
       : blocks
 
   return (
-    `<svg xmlns="http://www.w3.org/2000/svg" width="2000" height="${RULE_HEIGHT}" viewBox="0 0 ${width} ${RULE_HEIGHT}" preserveAspectRatio="none">` +
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${PROGRESS_WIDTH}" height="${RULE_HEIGHT}" viewBox="0 0 ${width} ${RULE_HEIGHT}" preserveAspectRatio="none">` +
     `<rect width="${width}" height="${RULE_HEIGHT}" fill="${PANEL}"/>` +
     `<rect y="2" width="${width}" height="1" fill="${LINE}" fill-opacity="0.6"/>${body}</svg>`
   )
@@ -1525,6 +1525,7 @@ export const register: Register = on => {
         <Svg
           source={waveSvg(isRunning(current), tasks)}
           alt={isRunning(current) ? 'Working' : 'Idle'}
+          width={PROGRESS_WIDTH}
           height={RULE_HEIGHT}
           isInteractive
         />
