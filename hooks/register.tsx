@@ -1516,7 +1516,14 @@ export const register: Register = on => {
           ),
         )}
         <Svg source={RULE} alt="divider" height={RULE_HEIGHT} />
-        <Box flexDirection="row" flexWrap="wrap" columnGap={1}>
+        {/* Top-aligned, so the patch behind a copy button is the button's own
+            size and not stretched to the height of the row. */}
+        <Box
+          flexDirection="row"
+          flexWrap="wrap"
+          alignItems="flex-start"
+          columnGap={1}
+        >
           <Svg
             source={chipSvg(hostChip)}
             alt={host}
