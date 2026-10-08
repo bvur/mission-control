@@ -1345,24 +1345,24 @@ export const register: Register = on => {
         ? ''
         : ` · steps ${shown[0]?.number ?? 0}–${shown.at(-1)?.number ?? 0} of ${numberOf(rows.at(-1) as Entry, rows.length - 1)}`
     const pager =
-      most === 0 ? null : (
-        <Box flexDirection="row" columnGap={1}>
-          <Button
-            key="older"
-            label="▲"
-            onPress={() =>
-              update($, scroll, () => Math.min(most, back + ROW_COUNT - 1))
-            }
-          />
-          <Button
-            key="newer"
-            label="▼"
-            onPress={() =>
-              update($, scroll, () => Math.max(0, back - (ROW_COUNT - 1)))
-            }
-          />
-        </Box>
-      )
+      most === 0
+        ? []
+        : [
+            <Button
+              key="older"
+              label="▲ Earlier steps"
+              onPress={() =>
+                update($, scroll, () => Math.min(most, back + ROW_COUNT - 1))
+              }
+            />,
+            <Button
+              key="newer"
+              label="▼ Later steps"
+              onPress={() =>
+                update($, scroll, () => Math.max(0, back - (ROW_COUNT - 1)))
+              }
+            />,
+          ]
     const isTerminal = surface === 'terminal'
     // The cache is refreshed by every request, so it only ages between turns.
     const remaining = isRunning(current)
@@ -1370,32 +1370,31 @@ export const register: Register = on => {
       : current.endedAt === null
         ? undefined
         : CACHE_MINUTES * 60_000 - (time - current.endedAt)
+    // Every control sits in one row under the panel, where the app's own
+    // button style matches what is behind it.
     const buttons = (
-      <Box flexDirection="row" columnGap={1}>
-        {isTerminal ? (
-          <Button
-            key="copy"
-            label="Copy path"
-            onPress={() => copyText($, where.cwd, surface)}
-          />
-        ) : null}
-        {name === null || !isTerminal ? null : (
+      <Box flexDirection="row" flexWrap="wrap" columnGap={1}>
+        {name === null ? null : (
           <Button
             key="copy-name"
             label="Copy name"
             onPress={() => copyText($, name, surface)}
           />
         )}
-        {branch === '' || !isTerminal ? null : (
+        <Button
+          key="copy"
+          label="Copy path"
+          onPress={() => copyText($, where.cwd, surface)}
+        />
+        {branch === '' ? null : (
           <Button
             key="copy-branch"
             label="Copy branch"
             onPress={() => copyText($, branch, surface)}
           />
         )}
-        {isTerminal ? (
-          <Button key="compact" label="Compact" onPress={() => compact($)} />
-        ) : null}
+        <Button key="compact" label="Compact" onPress={() => compact($)} />
+        {pager}
       </Box>
     )
 
@@ -1413,7 +1412,6 @@ export const register: Register = on => {
           {shown.map(each => (
             <Text dimColor>{rowReading(each.row, each.number)}</Text>
           ))}
-          {pager}
           <Text wrap="wrap">
             {[host, ...chips.map(chip => chip.label), elapsed ?? '']
               .filter(part => part !== '')
@@ -1454,11 +1452,8 @@ export const register: Register = on => {
     }
 
     const { Svg } = $.ui.resolve(e)
-    const patch = PATCH === '' ? {} : { backgroundColor: PATCH }
     const running = isRunning(current)
     const spent = (journal.spans ?? []).reduce((sum, span) => sum + span, 0)
-    // The pager's two buttons take their room from the summary.
-    const summaryWidth = PROGRESS_WIDTH - (pager === null ? 0 : 76)
     const hostChip: Chip = { icon: isLocal ? 'laptop' : 'cloud', label: '' }
 
     return (
@@ -1484,17 +1479,16 @@ export const register: Register = on => {
               journal.spans ?? [],
               time,
               began === null || time <= 0 ? null : time - began,
-              summaryWidth,
+              PROGRESS_WIDTH,
               range,
             )}
             alt={[progressReading(current, tasks, calls) + range]
               .concat(elapsed === null ? [] : [`Conversation time ${elapsed}`])
               .join('; ')}
-            width={summaryWidth}
+            width={PROGRESS_WIDTH}
             height={ROW_HEIGHT}
             isInteractive
           />
-          {pager === null ? null : <Box {...patch}>{pager}</Box>}
         </Box>
         {shown.map(each =>
           each.row.endedAt === null ? (
@@ -1522,29 +1516,14 @@ export const register: Register = on => {
             width={chipWidth(hostChip)}
             height={CHIP_HEIGHT + CHIP_GAP}
           />
-          {chips.flatMap(chip => {
-            const text = chip.copy
-
-            return [
-              <Svg
-                source={chipSvg(chip)}
-                alt={chip.label === '' ? 'No worktree' : chip.label}
-                width={chipWidth(chip)}
-                height={CHIP_HEIGHT + CHIP_GAP}
-              />,
-              text === undefined ? null : (
-                // A muted patch, since the app styles its button for its own
-                // background, not the panel's.
-                <Box {...patch}>
-                  <Button
-                    key={`copy-${chip.icon}`}
-                    label="⧉"
-                    onPress={() => copyText($, text, surface)}
-                  />
-                </Box>
-              ),
-            ]
-          })}
+          {chips.map(chip => (
+            <Svg
+              source={chipSvg(chip)}
+              alt={chip.label === '' ? 'No worktree' : chip.label}
+              width={chipWidth(chip)}
+              height={CHIP_HEIGHT + CHIP_GAP}
+            />
+          ))}
         </Box>
         <Box flexDirection="column">
           {bars.map((bar, index) => {
@@ -1576,21 +1555,13 @@ export const register: Register = on => {
                   isInteractive
                 />
               ) : null}
-              {bar.label === 'Context' ? (
-                <Box {...patch}>
-                  <Button
-                    key="compact"
-                    label="⇲"
-                    onPress={() => compact($)}
-                  />
-                </Box>
-              ) : null}
             </Box>
             )
           })}
         </Box>
       </Box>
-      <Box flexDirection="row" justifyContent="flex-end">
+      <Box flexDirection="row" justifyContent="space-between" columnGap={1}>
+        {buttons}
         {themeSelect}
       </Box>
       </Box>
