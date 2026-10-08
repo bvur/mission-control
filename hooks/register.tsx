@@ -556,6 +556,9 @@ const ROW_COUNT = 5
 const ROW_KEEP = 300
 const SPAN_COUNT = 200
 const ROW_EDGE = PROGRESS_WIDTH - 44
+// The time and share columns: on a running step, a drawing of their own, so
+// its ticking clock is all that is redrawn.
+const ROW_CLOCK = 92
 
 // One step: its number, a box ticked once it is done, the tool's name and
 // what the call was for, and how long the step took. A drawing of its own, so
@@ -574,17 +577,15 @@ function rowSvg(
   const [tool = '', ...rest] = shorten(row.label, 86).split(' · ')
   const words = rest.length > 0 ? ` · ${rest.join(' · ')}` : ''
   const label = `<text x="44" y="12" ${text}><tspan class="m" fill="${MINT}" font-weight="600">${escapeXml(tool)}</tspan>${escapeXml(words)}</text>`
-  const open = `<svg xmlns="http://www.w3.org/2000/svg" width="${PROGRESS_WIDTH}" height="${ROW_HEIGHT}" viewBox="0 0 ${PROGRESS_WIDTH} ${ROW_HEIGHT}">${STYLE}${backdrop(PROGRESS_WIDTH, ROW_HEIGHT)}`
+  const wide =
+    row.endedAt === null ? PROGRESS_WIDTH - ROW_CLOCK : PROGRESS_WIDTH
+  const open = `<svg xmlns="http://www.w3.org/2000/svg" width="${wide}" height="${ROW_HEIGHT}" viewBox="0 0 ${wide} ${ROW_HEIGHT}">${STYLE}${backdrop(wide, ROW_HEIGHT)}`
   if (row.endedAt === null) {
-    const seconds = Math.max(0, Math.floor((time - row.startedAt) / 1000))
     const pulse = running
-      ? `<rect x="30" y="6" width="4" height="4" rx="1" fill="${MINT}"><animate attributeName="opacity" values="1;0.2;1" dur="1.2s" repeatCount="indefinite"/></rect>`
-      : ''
-    const clock = running
-      ? tickingClock(ROW_EDGE, 12, FONT_SIZE, seconds, 'm')
+      ? `<rect x="30" y="6" width="4" height="4" rx="1" fill="${MINT}"/>`
       : ''
 
-    return `${open}${count}${box}${pulse}${label}${clock}</svg>`
+    return `${open}${count}${box}${pulse}${label}</svg>`
   }
   const mark = row.failed
     ? `<path d="M30 6l4 4m0 -4l-4 4" fill="none" stroke="${RED}" stroke-width="1.6" stroke-linecap="round"/>`
@@ -635,54 +636,90 @@ function sessionClock(ms: number, right: number): string {
   )
 }
 
-// The block above everything: the turn's own clock, a bar and a summary, then
-// a row per step. While the turn runs the bar fills by the task list's steps
-// when there is one, and otherwise only sweeps, since nothing says how much
-// work is left.
+// A clock in a drawing of its own: the only kind that must be redrawn each
+// time the panel is, since where it starts depends on the moment it is drawn.
+function clockSvg(width: number, body: string): string {
+  return (
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${ROW_HEIGHT}" viewBox="0 0 ${width} ${ROW_HEIGHT}">${STYLE}${backdrop(width, ROW_HEIGHT)}` +
+    `${body}</svg>`
+  )
+}
+
+function secondsOf(ms: number): number {
+  return Math.max(0, Math.floor(ms / 1000))
+}
+
+function turnClockWidth(ms: number): number {
+  return Math.ceil(clockWidth(FONT_SIZE, secondsOf(ms))) + 10
+}
+
+function turnClockSvg(ms: number): string {
+  const width = turnClockWidth(ms)
+
+  return clockSvg(
+    width,
+    tickingClock(width - 10, 12, FONT_SIZE, secondsOf(ms), 'm'),
+  )
+}
+
+function sessionClockWidth(ms: number): number {
+  return (
+    18 +
+    textWidth('Conversation time') +
+    8 +
+    Math.ceil(clockWidth(FONT_SIZE, secondsOf(ms)))
+  )
+}
+
+function sessionClockSvg(ms: number): string {
+  const width = sessionClockWidth(ms)
+
+  return clockSvg(width, sessionClock(ms, width))
+}
+
+function rowClockSvg(row: Entry, time: number): string {
+  return clockSvg(
+    ROW_CLOCK,
+    tickingClock(
+      ROW_CLOCK - 44,
+      12,
+      FONT_SIZE,
+      secondsOf(time - row.startedAt),
+      'm',
+    ),
+  )
+}
+
+// A step's row with nothing in it, to hold the list's height while a turn
+// runs so that a new step does not move what is below.
+function blankRowSvg(): string {
+  return clockSvg(PROGRESS_WIDTH, '')
+}
+
+// The summary beside the clocks: once the turn is over, the bar of where its
+// time went, and always what the turn is doing or how it ended. It holds no
+// clock, so it is only redrawn when its words change.
 function progressSvg(
   now: Activity,
   list: Step[],
   calls: number,
   spans: number[],
-  time: number,
-  session: number | null,
   width: number,
   note: string,
 ): string {
   const running = isRunning(now) && now.startedAt !== null
-  const seconds = running
-    ? Math.max(0, Math.floor((time - (now.startedAt ?? time)) / 1000))
-    : 0
-  const left = running ? Math.ceil(clockWidth(FONT_SIZE, seconds)) + 10 : 0
   const total = spans.reduce((sum, span) => sum + span, 0)
   const bar = !running && total > 0 ? sharesSvg(spans, total) : ''
-  const edge = running
-    ? left
-    : total > 0
-      ? SHARE_TRACK + 12
-      : 0
-  const height = ROW_HEIGHT
-  // The summary is cut where the conversation clock begins.
-  const clock =
-    session === null
-      ? 0
-      : 18 +
-        textWidth('Conversation time') +
-        8 +
-        clockWidth(FONT_SIZE, Math.floor(session / 1000)) +
-        12
+  const edge = !running && total > 0 ? SHARE_TRACK + 12 : 0
   const room = Math.max(
     8,
-    Math.floor((width - clock - edge) / (FONT_SIZE * ADVANCE)),
+    Math.floor((width - edge - 12) / (FONT_SIZE * ADVANCE)),
   )
 
-  return (
-    `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">${STYLE}${backdrop(width, height)}` +
-    (running ? tickingClock(left - 10, 12, FONT_SIZE, seconds, 'm') : '') +
+  return clockSvg(
+    width,
     bar +
-    `<text x="${edge}" y="12" class="${activityInk(now)}" font-family="${FONT}" font-size="${FONT_SIZE}">${escapeXml(shorten(progressReading(now, list, calls) + note, room))}</text>` +
-    (session === null ? '' : sessionClock(session, width)) +
-    `</svg>`
+      `<text x="${edge}" y="12" class="${activityInk(now)}" fill="${INK}" font-family="${FONT}" font-size="${FONT_SIZE}">${escapeXml(shorten(progressReading(now, list, calls) + note, room))}</text>`,
   )
 }
 
@@ -1471,6 +1508,14 @@ export const register: Register = on => {
     // The paging buttons take their room from the summary.
     const summaryWidth = PROGRESS_WIDTH - (pager.length === 0 ? 0 : 60)
     const spent = (journal.spans ?? []).reduce((sum, span) => sum + span, 0)
+    const session = began === null || time <= 0 ? null : time - began
+    // What the two clocks leave of the summary line.
+    const wordsWidth =
+      summaryWidth -
+      (running && current.startedAt !== null
+        ? turnClockWidth(time - current.startedAt)
+        : 0) -
+      (session === null ? 0 : sessionClockWidth(session))
     const hostChip: Chip = { icon: isLocal ? 'laptop' : 'cloud', label: '' }
 
     return (
@@ -1482,41 +1527,72 @@ export const register: Register = on => {
         paddingRight={1}
       >
         <Box flexDirection="row" alignItems="center" columnGap={1}>
-          <Svg
-            source={progressSvg(
-              current,
-              tasks,
-              calls,
-              journal.spans ?? [],
-              time,
-              began === null || time <= 0 ? null : time - began,
-              summaryWidth,
-              range,
+          <Box flexDirection="row">
+            {running && current.startedAt !== null ? (
+              <Svg
+                source={turnClockSvg(time - current.startedAt)}
+                alt="Turn time"
+                width={turnClockWidth(time - current.startedAt)}
+                height={ROW_HEIGHT}
+                isInteractive
+              />
+            ) : null}
+            <Svg
+              source={progressSvg(
+                current,
+                tasks,
+                calls,
+                journal.spans ?? [],
+                wordsWidth,
+                range,
+              )}
+              alt={progressReading(current, tasks, calls) + range}
+              width={wordsWidth}
+              height={ROW_HEIGHT}
+            />
+            {session === null ? null : (
+              <Svg
+                source={sessionClockSvg(session)}
+                alt={`Conversation time ${elapsed ?? ''}`}
+                width={sessionClockWidth(session)}
+                height={ROW_HEIGHT}
+                isInteractive
+              />
             )}
-            alt={[progressReading(current, tasks, calls) + range]
-              .concat(elapsed === null ? [] : [`Conversation time ${elapsed}`])
-              .join('; ')}
-            width={summaryWidth}
-            height={ROW_HEIGHT}
-            isInteractive
-          />
+          </Box>
           {pager.map(button => (
             <Box {...patch}>{button}</Box>
           ))}
         </Box>
-        {shown.map(each =>
-          each.row.endedAt === null ? (
+        {shown.map(each => (
+          <Box flexDirection="row">
             <Svg
               source={rowSvg(each.row, each.number, time, running, spent)}
               alt={rowReading(each.row, each.number)}
-              width={PROGRESS_WIDTH}
+              width={
+                each.row.endedAt === null
+                  ? PROGRESS_WIDTH - ROW_CLOCK
+                  : PROGRESS_WIDTH
+              }
               height={ROW_HEIGHT}
-              isInteractive
             />
-          ) : (
+            {each.row.endedAt === null && running ? (
+              <Svg
+                source={rowClockSvg(each.row, time)}
+                alt="Step time"
+                width={ROW_CLOCK}
+                height={ROW_HEIGHT}
+                isInteractive
+              />
+            ) : null}
+          </Box>
+        ))}
+        {Array.from(
+          { length: running ? Math.max(0, ROW_COUNT - shown.length) : 0 },
+          () => (
             <Svg
-              source={rowSvg(each.row, each.number, time, running, spent)}
-              alt={rowReading(each.row, each.number)}
+              source={blankRowSvg()}
+              alt=" "
               width={PROGRESS_WIDTH}
               height={ROW_HEIGHT}
             />
