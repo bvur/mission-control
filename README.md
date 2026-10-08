@@ -8,8 +8,8 @@ session is doing and what it is costing.
 ## What it shows
 
 - **Work in progress.** A numbered row per step of the current turn: the tool
-  used, what the call was for, how long it took and its share of the turn. A
-  thin strip along the top animates while a turn runs. When the turn ends the
+  used, what the call was for, how long it took and its share of the turn. The
+  line under the steps animates while a turn runs. When the turn ends the
   summary reads "Completed" with the total time, and a segmented bar shows
   where the time went.
 - **Session.** Whether Claude runs locally or in the cloud, the session name,

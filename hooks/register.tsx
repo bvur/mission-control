@@ -192,7 +192,6 @@ const AMBER = '#e0a458'
 const RED = '#e5695f'
 // Selectable text, in the theme's ink whatever the app's own theme.
 let STYLE = ''
-let RULE = ''
 // The divider's line sits near its top, leaving room beneath it.
 const RULE_HEIGHT = 11
 
@@ -222,9 +221,6 @@ function applyTheme(name: string): void {
     `text{user-select:text;-webkit-user-select:text;cursor:text;fill:${INK}}` +
     `.s{stroke:${INK}}.t{fill:${INK}}.b{stroke:${LINE}}${night}` +
     `.m{fill:${MINT}}.g{fill:${GREEN}}.a{fill:${AMBER}}</style>`
-  RULE =
-    `<svg xmlns="http://www.w3.org/2000/svg" width="2000" height="${RULE_HEIGHT}" viewBox="0 0 2000 ${RULE_HEIGHT}" preserveAspectRatio="none">` +
-    `<rect width="2000" height="${RULE_HEIGHT}" fill="${PANEL}"/><rect y="2" width="2000" height="1" fill="${LINE}" fill-opacity="0.6"/></svg>`
 }
 
 applyTheme(DEFAULT_THEME)
@@ -530,9 +526,10 @@ const PROGRESS_WIDTH = 736
 const WAVE_BLOCKS = 48
 const WAVE_HEIGHT = 3
 
-// The strip along the panel's top edge, stretched to its width. While a turn
-// runs it fills by the task list's steps when there is one; with none there is
-// no amount to show, so a slow wave runs along it instead.
+// The line between the work in progress and the chips, stretched to the
+// panel's width, with clear room beneath it. While a turn runs it fills by the
+// task list's steps when there is one; with none there is no amount to show,
+// so a streak glides along it instead.
 function waveSvg(running: boolean, list: Step[]): string {
   const width = WAVE_BLOCKS * 5
   const done = list.filter(step => step.status === 'completed').length
@@ -540,16 +537,17 @@ function waveSvg(running: boolean, list: Step[]): string {
   const streak = width * 0.3
   const blocks =
     `<defs><linearGradient id="g"><stop offset="0" stop-color="${MINT}" stop-opacity="0"/><stop offset="0.7" stop-color="${MINT}"/><stop offset="1" stop-color="${MINT}" stop-opacity="0"/></linearGradient></defs>` +
-    `<rect x="${-streak}" width="${streak}" height="${WAVE_HEIGHT}" fill="url(#g)"><animate attributeName="x" values="${-streak};${width}" dur="2s" repeatCount="indefinite"/></rect>`
+    `<rect x="${-streak}" y="1" width="${streak}" height="${WAVE_HEIGHT}" fill="url(#g)"><animate attributeName="x" values="${-streak};${width}" dur="2s" repeatCount="indefinite"/></rect>`
   const body = !running
     ? ''
     : list.length > 0
-      ? `<rect width="${(done / list.length) * width}" height="${WAVE_HEIGHT}" fill="${MINT}"/>`
+      ? `<rect y="1" width="${(done / list.length) * width}" height="${WAVE_HEIGHT}" fill="${MINT}"/>`
       : blocks
 
   return (
-    `<svg xmlns="http://www.w3.org/2000/svg" width="2000" height="${WAVE_HEIGHT}" viewBox="0 0 ${width} ${WAVE_HEIGHT}" preserveAspectRatio="none">` +
-    `<rect width="${width}" height="${WAVE_HEIGHT}" fill="${INSET}"/>${body}</svg>`
+    `<svg xmlns="http://www.w3.org/2000/svg" width="2000" height="${RULE_HEIGHT}" viewBox="0 0 ${width} ${RULE_HEIGHT}" preserveAspectRatio="none">` +
+    `<rect width="${width}" height="${RULE_HEIGHT}" fill="${PANEL}"/>` +
+    `<rect y="2" width="${width}" height="1" fill="${LINE}" fill-opacity="0.6"/>${body}</svg>`
   )
 }
 const ROW_HEIGHT = 16
@@ -1477,12 +1475,6 @@ export const register: Register = on => {
 
     return (
       <Box flexDirection="column">
-      <Svg
-        source={waveSvg(isRunning(current), tasks)}
-        alt={isRunning(current) ? 'Working' : 'Idle'}
-        height={WAVE_HEIGHT}
-        isInteractive
-      />
       <Box
         flexDirection="column"
         {...(PANEL === 'none' ? {} : { backgroundColor: PANEL })}
@@ -1530,7 +1522,12 @@ export const register: Register = on => {
             />
           ),
         )}
-        <Svg source={RULE} alt="divider" height={RULE_HEIGHT} />
+        <Svg
+          source={waveSvg(isRunning(current), tasks)}
+          alt={isRunning(current) ? 'Working' : 'Idle'}
+          height={RULE_HEIGHT}
+          isInteractive
+        />
         {/* Top-aligned, so the patch behind a copy button is the button's own
             size and not stretched to the height of the row. */}
         <Box
