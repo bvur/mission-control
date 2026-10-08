@@ -47,7 +47,6 @@ test('the band shows the session and its meters', async ($, on) => {
     },
   }))
   on('session.start', ($$, e) => ({ cwd: e.cwd }))
-  on('command.register', () => ({ value: undefined }))
   on('command.run', ($$, e) => {
     if (e.command === 'compact') compactions += 1
 
@@ -109,7 +108,7 @@ test('the band shows the session and its meters', async ($, on) => {
     expect(drawn).not.toContain('feature/login · 1 changed')
     // The terminal pass picked Graphite before this one draws.
     if (surface === 'desktop') expect(drawn).toContain('#2a2a2c')
-    await $.command.run({ command: 'mc-theme', args: 'graphite' })
+    await ui.select({ key: 'theme', value: 'Graphite' })
     await ui.press({ key: 'compact' })
     await ui.unmount()
   }

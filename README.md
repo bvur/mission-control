@@ -21,13 +21,12 @@ session is doing and what it is costing.
 
 ## Controls
 
-- Text in the panel can be selected with the mouse and copied.
-- A compact button beside the Context bar runs `/compact` once Claude is idle.
-- `/mc-theme <name>` sets the theme, which is remembered across sessions.
-  Themes: Forest, Midnight, Graphite, Paper, Ocean, Plum, Ember, Slate and
-  Sand. `/mc-theme` alone lists them.
-- `/mc-steps earlier` and `/mc-steps later` page through the steps of a turn
-  that has more than five; `/mc-steps` alone returns to the latest.
+- A copy button beside the session name, working directory and branch, and paging arrows beside the summary when a turn has more than five steps.
+- A compact button beside the Context bar, which runs `/compact` once Claude
+  is idle.
+- A theme dropdown in the bottom right corner. The choice is remembered across
+  sessions. Themes: Forest, Midnight, Graphite, Paper, Ocean, Plum, Ember,
+  Slate and Sand.
 
 ## Install
 
@@ -51,9 +50,9 @@ every session).
   `CACHE_MINUTES` in `hooks/register.tsx` to 5 if your plan uses the
   five-minute cache. The countdown is an estimate: it restarts when a turn
   ends.
-- The work-in-progress list shows five numbered steps at a time.
-- The compact button is drawn by the app, so it keeps the app's own style on
-  every theme.
+- The work-in-progress list shows five numbered steps at a time, with buttons to page back through a longer turn.
+- Buttons are drawn by the app, so they keep the app's own
+  style on every theme.
 
 ## Development
 
