@@ -106,9 +106,9 @@ test('the band shows the session and its meters', async ($, on) => {
     for (const text of shown) expect(drawn).toContain(text)
     expect(drawn).not.toContain('Users')
     expect(drawn).not.toContain('feature/login · 1 changed')
-    // The terminal pass stepped from Midnight to Graphite before this one.
+    // The terminal pass picked Graphite before this one draws.
     if (surface === 'desktop') expect(drawn).toContain('#2a2a2c')
-    await ui.press({ key: 'theme' })
+    await ui.select({ key: 'theme', value: 'Graphite' })
     await ui.press({ key: 'compact' })
     await ui.unmount()
   }

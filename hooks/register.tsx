@@ -1250,17 +1250,14 @@ export const register: Register = on => {
             },
           ],
     )
-    const { Box, Button, Text } = $.ui.resolve(e)
-    const names = Object.keys(THEMES)
-    const nextTheme = names[(names.indexOf(look) + 1) % names.length] ?? look
+    const { Box, Button, Select, Text } = $.ui.resolve(e)
     const themeSelect = (
-      <Button
+      <Select
         key="theme"
-        label="◐"
-        onPress={async () => {
-          await pickTheme($, nextTheme)
-          await report($, `Theme: ${nextTheme}`)
-        }}
+        label="Theme"
+        options={Object.keys(THEMES).map(name => ({ value: name }))}
+        value={look}
+        onSelect={value => pickTheme($, value)}
       />
     )
     const began = await read($, startedAt)
@@ -1578,14 +1575,13 @@ export const register: Register = on => {
                   />
                 </Box>
               ) : null}
-              {index === bars.length - 1 ? <Box flexGrow={1} /> : null}
-              {index === bars.length - 1 ? (
-                <Box {...patch}>{themeSelect}</Box>
-              ) : null}
             </Box>
             )
           })}
         </Box>
+      </Box>
+      <Box flexDirection="row" justifyContent="flex-end">
+        {themeSelect}
       </Box>
       </Box>
     )

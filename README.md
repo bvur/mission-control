@@ -24,7 +24,7 @@ session is doing and what it is costing.
 - A copy button beside the session name, working directory and branch.
 - A compact button beside the Context bar, which runs `/compact` once Claude
   is idle.
-- A theme button in the bottom right corner steps through the themes. The choice is remembered across
+- A theme dropdown under the panel, on the right. The choice is remembered across
   sessions. Themes: Forest, Midnight, Graphite, Paper, Ocean, Plum, Ember,
   Slate and Sand.
 
