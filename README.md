@@ -16,7 +16,7 @@ session is doing and what it is costing.
 - **Usage.** Current session and weekly limits with the time left until each
   resets, context window use, and how much of the last turn's input came from
   the prompt cache.
-- **Clocks.** Current session time, and a countdown to when the prompt cache
+- **Clocks.** Conversation time, and a countdown to when the prompt cache
   expires.
 
 ## Controls
@@ -24,7 +24,7 @@ session is doing and what it is costing.
 - A copy button beside the session name, working directory and branch.
 - A compact button beside the Context bar, which runs `/compact` once Claude
   is idle.
-- A theme dropdown in the bottom right corner. The choice is remembered across
+- A theme button in the bottom right corner steps through the themes. The choice is remembered across
   sessions. Themes: Forest, Midnight, Graphite, Paper, Ocean, Plum, Ember,
   Slate and Sand.
 
@@ -50,8 +50,8 @@ every session).
   `CACHE_MINUTES` in `hooks/register.tsx` to 5 if your plan uses the
   five-minute cache. The countdown is an estimate: it restarts when a turn
   ends.
-- The work-in-progress list keeps the last five steps of a turn.
-- Buttons and the dropdown are drawn by the app, so they keep the app's own
+- The work-in-progress list shows five numbered steps at a time, with buttons to page back through a longer turn.
+- Buttons are drawn by the app, so they keep the app's own
   style on every theme.
 
 ## Development

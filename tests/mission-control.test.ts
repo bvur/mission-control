@@ -99,15 +99,15 @@ test('the band shows the session and its meters', async ($, on) => {
       '23% used · 46k of 200k tokens',
       'Fixing it · 1 of 2 steps',
       'Ready',
-      'Read · notes.md',
+      '1. [✓] Read · notes.md',
       '0:00:00',
       'feature/login · 1 changed · ↑2',
     ]
     for (const text of shown) expect(drawn).toContain(text)
     expect(drawn).not.toContain('Users')
-    // The terminal pass picked Paper before the desktop one draws.
-    if (surface === 'desktop') expect(drawn).toContain('#f3f1ec')
-    await ui.select({ key: 'theme', value: 'Paper' })
+    // The terminal pass stepped from Midnight to Graphite before this one.
+    if (surface === 'desktop') expect(drawn).toContain('#2a2a2c')
+    await ui.press({ key: 'theme' })
     await ui.press({ key: 'compact' })
     await ui.unmount()
   }

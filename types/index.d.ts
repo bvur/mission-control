@@ -19,6 +19,8 @@ export type Entry = {
   startedAt: number
   endedAt: number | null
   failed: boolean
+  // The step's number within its turn.
+  n?: number
 }
 
 export type Step = { id: string; subject: string; status: string }
@@ -43,6 +45,7 @@ declare module 'claude-code' {
       activity: Activity
       steps: Step[]
       theme: string
+      scroll: number
       cache: { read: number; fresh: number } | null
       log: { calls: number; rows: Entry[]; mark: number; spans: number[] }
     }

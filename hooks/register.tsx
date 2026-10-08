@@ -47,6 +47,8 @@ const theme = atom(
   DEFAULT_THEME,
 )
 
+const scroll = atom({ plugin: 'mission-control', key: 'scroll' } as const, 0)
+
 const LABEL_COLUMNS = 17
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const LIMIT_LABELS: Record<string, string> = {
@@ -546,51 +548,52 @@ function waveSvg(running: boolean, list: Step[]): string {
 }
 const ROW_HEIGHT = 16
 const ROW_COUNT = 5
+// Every step of a turn is kept, up to this many; the panel shows a window.
+const ROW_KEEP = 300
 const SPAN_COUNT = 200
 const ROW_EDGE = 670
 
-function progressHeight(rows: Entry[]): number {
-  return ROW_HEIGHT * (1 + rows.length)
-}
-
-// One tool call: a box ticked once it is done, its name, and how long it took.
+// One step: its number, a box ticked once it is done, the tool's name and
+// what the call was for, and how long the step took. A drawing of its own, so
+// a finished step is never redrawn when the next one starts.
 function rowSvg(
   row: Entry,
-  index: number,
+  number: number,
   time: number,
   running: boolean,
   total: number,
 ): string {
-  const top = ROW_HEIGHT * (index + 1)
-  const baseline = top + 12
-  const box = `<rect x="1.5" y="${top + 3.5}" width="9" height="9" rx="2" fill="none" class="b" stroke="${LINE}"/>`
+  const text = `font-family="${FONT}" font-size="${FONT_SIZE}" fill="${INK}"`
+  const count = `<text x="20" y="12" text-anchor="end" fill-opacity="0.6" ${text}>${number}</text>`
+  const box = `<rect x="27.5" y="3.5" width="9" height="9" rx="2" fill="none" class="b" stroke="${LINE}"/>`
   // The tool's name stands out from what the call was for.
-  const [tool = '', ...rest] = shorten(row.label, 88).split(' · ')
+  const [tool = '', ...rest] = shorten(row.label, 84).split(' · ')
   const words = rest.length > 0 ? ` · ${rest.join(' · ')}` : ''
-  const label = `<text x="18" y="${baseline}" font-family="${FONT}" font-size="${FONT_SIZE}"><tspan class="m" font-weight="600">${escapeXml(tool)}</tspan>${escapeXml(words)}</text>`
+  const label = `<text x="44" y="12" ${text}><tspan class="m" fill="${MINT}" font-weight="600">${escapeXml(tool)}</tspan>${escapeXml(words)}</text>`
+  const open = `<svg xmlns="http://www.w3.org/2000/svg" width="${PROGRESS_WIDTH}" height="${ROW_HEIGHT}" viewBox="0 0 ${PROGRESS_WIDTH} ${ROW_HEIGHT}">${STYLE}${backdrop(PROGRESS_WIDTH, ROW_HEIGHT)}`
   if (row.endedAt === null) {
     const seconds = Math.max(0, Math.floor((time - row.startedAt) / 1000))
     const pulse = running
-      ? `<rect x="4" y="${top + 6}" width="4" height="4" rx="1" fill="${MINT}"><animate attributeName="opacity" values="1;0.2;1" dur="1.2s" repeatCount="indefinite"/></rect>`
+      ? `<rect x="30" y="6" width="4" height="4" rx="1" fill="${MINT}"><animate attributeName="opacity" values="1;0.2;1" dur="1.2s" repeatCount="indefinite"/></rect>`
       : ''
     const clock = running
-      ? tickingClock(ROW_EDGE, baseline, FONT_SIZE, seconds, 'm')
+      ? tickingClock(ROW_EDGE, 12, FONT_SIZE, seconds, 'm')
       : ''
 
-    return box + pulse + label + clock
+    return `${open}${count}${box}${pulse}${label}${clock}</svg>`
   }
   const mark = row.failed
-    ? `<path d="M4 ${top + 6}l4 4m0 -4l-4 4" fill="none" stroke="${RED}" stroke-width="1.6" stroke-linecap="round"/>`
-    : `<path d="M3.5 ${top + 8.5}l2 2l3.5 -4.5" fill="none" stroke="${GREEN}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>`
+    ? `<path d="M30 6l4 4m0 -4l-4 4" fill="none" stroke="${RED}" stroke-width="1.6" stroke-linecap="round"/>`
+    : `<path d="M29.5 8.5l2 2l3.5 -4.5" fill="none" stroke="${GREEN}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>`
+  const share =
+    running || total <= 0
+      ? ''
+      : `<text x="${ROW_EDGE + 40}" y="12" text-anchor="end" fill-opacity="0.75" ${text}>${Math.round(((row.endedAt - row.startedAt) / total) * 100)}%</text>`
 
   return (
-    box +
-    mark +
-    label +
-    `<text x="${ROW_EDGE}" y="${baseline}" text-anchor="end" font-family="${FONT}" font-size="${FONT_SIZE}" fill-opacity="0.75">${formatElapsed(row.endedAt - row.startedAt)}</text>` +
-    (running || total <= 0
-      ? ''
-      : `<text x="${ROW_EDGE + 40}" y="${baseline}" text-anchor="end" font-family="${FONT}" font-size="${FONT_SIZE}" fill-opacity="0.75">${Math.round(((row.endedAt - row.startedAt) / total) * 100)}%</text>`)
+    `${open}${count}${box}${mark}${label}` +
+    `<text x="${ROW_EDGE}" y="12" text-anchor="end" fill-opacity="0.75" ${text}>${formatElapsed(row.endedAt - row.startedAt)}</text>` +
+    `${share}</svg>`
   )
 }
 
@@ -616,15 +619,15 @@ function sharesSvg(spans: number[], total: number): string {
 }
 
 // The session's own clock, in the block's top right corner.
-function sessionClock(ms: number): string {
+function sessionClock(ms: number, right: number): string {
   const seconds = Math.max(0, Math.floor(ms / 1000))
-  const label = PROGRESS_WIDTH - Math.ceil(clockWidth(FONT_SIZE, seconds)) - 8
-  const start = label - textWidth('Current session time')
+  const label = right - Math.ceil(clockWidth(FONT_SIZE, seconds)) - 8
+  const start = label - textWidth('Conversation time')
 
   return (
     `<g transform="translate(${start - 18} 2) scale(0.5)" fill="none" class="s" stroke="${INK}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICONS.clock}</g>` +
-    `<text x="${label}" y="12" text-anchor="end" font-family="${FONT}" font-size="${FONT_SIZE}">Current session time</text>` +
-    `<g>${tickingClock(PROGRESS_WIDTH, 12, FONT_SIZE, seconds, 't').replace(/w12/g, 'ws')}</g>`
+    `<text x="${label}" y="12" text-anchor="end" font-family="${FONT}" font-size="${FONT_SIZE}">Conversation time</text>` +
+    `<g>${tickingClock(right, 12, FONT_SIZE, seconds, 't').replace(/w12/g, 'ws')}</g>`
   )
 }
 
@@ -636,10 +639,11 @@ function progressSvg(
   now: Activity,
   list: Step[],
   calls: number,
-  rows: Entry[],
   spans: number[],
   time: number,
   session: number | null,
+  width: number,
+  note: string,
 ): string {
   const running = isRunning(now) && now.startedAt !== null
   const seconds = running
@@ -653,17 +657,14 @@ function progressSvg(
     : total > 0
       ? SHARE_TRACK + 12
       : 0
-  const height = progressHeight(rows)
+  const height = ROW_HEIGHT
 
   return (
-    `<svg xmlns="http://www.w3.org/2000/svg" width="${PROGRESS_WIDTH}" height="${height}" viewBox="0 0 ${PROGRESS_WIDTH} ${height}">${STYLE}${backdrop(PROGRESS_WIDTH, height)}` +
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">${STYLE}${backdrop(width, height)}` +
     (running ? tickingClock(left - 10, 12, FONT_SIZE, seconds, 'm') : '') +
     bar +
-    `<text x="${edge}" y="12" class="${activityInk(now)}" font-family="${FONT}" font-size="${FONT_SIZE}">${escapeXml(progressReading(now, list, calls))}</text>` +
-    (session === null ? '' : sessionClock(session)) +
-    rows
-      .map((row, index) => rowSvg(row, index, time, running, total))
-      .join('') +
+    `<text x="${edge}" y="12" class="${activityInk(now)}" font-family="${FONT}" font-size="${FONT_SIZE}">${escapeXml(progressReading(now, list, calls) + note)}</text>` +
+    (session === null ? '' : sessionClock(session, width)) +
     `</svg>`
   )
 }
@@ -674,10 +675,10 @@ function progressReading(now: Activity, list: Step[], calls: number): string {
     .join(' · ')
 }
 
-function rowReading(row: Entry): string {
-  if (row.endedAt === null) return `[ ] ${row.label}`
+function rowReading(row: Entry, number: number): string {
+  if (row.endedAt === null) return `${number}. [ ] ${row.label}`
 
-  return `[${row.failed ? 'x' : '✓'}] ${row.label}  ${formatElapsed(row.endedAt - row.startedAt)}`
+  return `${number}. [${row.failed ? 'x' : '✓'}] ${row.label}  ${formatElapsed(row.endedAt - row.startedAt)}`
 }
 
 type Call = { tool: string } & Record<string, unknown>
@@ -1078,6 +1079,7 @@ export const register: Register = on => {
         mark: time,
         spans: [],
       }))
+      await update($, scroll, () => 0)
       // A finished list belongs to the turn before.
       await update($, steps, list =>
         list.every(step => step.status === 'completed') ? [] : list,
@@ -1115,8 +1117,9 @@ export const register: Register = on => {
                 startedAt: now.mark > 0 ? now.mark : began,
                 endedAt: null,
                 failed: false,
+                n: (now.rows.at(-1)?.n ?? now.rows.length) + 1,
               },
-            ].slice(-ROW_COUNT),
+            ].slice(-ROW_KEEP),
           })),
         undefined,
       )
@@ -1187,8 +1190,9 @@ export const register: Register = on => {
             startedAt: now.mark > 0 ? now.mark : time,
             endedAt: time,
             failed: false,
+            n: (now.rows.at(-1)?.n ?? now.rows.length) + 1,
           },
-        ].slice(-ROW_COUNT),
+        ].slice(-ROW_KEEP),
       }))
       const root = await refreshPlace($)
       if ((await read($, title)) === null) await readTitle($, root)
@@ -1244,13 +1248,17 @@ export const register: Register = on => {
             },
           ],
     )
-    const { Box, Button, Select, Text } = $.ui.resolve(e)
+    const { Box, Button, Text } = $.ui.resolve(e)
+    const names = Object.keys(THEMES)
+    const nextTheme = names[(names.indexOf(look) + 1) % names.length] ?? look
     const themeSelect = (
-      <Select
+      <Button
         key="theme"
-        options={Object.keys(THEMES).map(name => ({ value: name }))}
-        value={look}
-        onSelect={value => pickTheme($, value)}
+        label="◐"
+        onPress={async () => {
+          await pickTheme($, nextTheme)
+          await report($, `Theme: ${nextTheme}`)
+        }}
       />
     )
     const began = await read($, startedAt)
@@ -1305,8 +1313,42 @@ export const register: Register = on => {
               endedAt: null,
               failed: false,
             },
-          ].slice(-ROW_COUNT)
+          ]
         : journal.rows
+    const first = rows.length - journal.rows.length === 1
+      ? (journal.rows.at(-1)?.n ?? journal.rows.length) + 1
+      : 0
+    const numberOf = (row: Entry, index: number): number =>
+      row.id === 'thinking' ? first : (row.n ?? index + 1)
+    const most = Math.max(0, rows.length - ROW_COUNT)
+    const back = Math.min(most, Math.max(0, await read($, scroll)))
+    const from = rows.length - ROW_COUNT - back
+    const shown = rows
+      .map((row, index) => ({ row, number: numberOf(row, index) }))
+      .slice(Math.max(0, from), rows.length - back)
+    const range =
+      most === 0
+        ? ''
+        : ` · steps ${shown[0]?.number ?? 0}–${shown.at(-1)?.number ?? 0} of ${numberOf(rows.at(-1) as Entry, rows.length - 1)}`
+    const pager =
+      most === 0 ? null : (
+        <Box flexDirection="row" columnGap={1}>
+          <Button
+            key="older"
+            label="▲"
+            onPress={() =>
+              update($, scroll, () => Math.min(most, back + ROW_COUNT - 1))
+            }
+          />
+          <Button
+            key="newer"
+            label="▼"
+            onPress={() =>
+              update($, scroll, () => Math.max(0, back - (ROW_COUNT - 1)))
+            }
+          />
+        </Box>
+      )
     const isTerminal = surface === 'terminal'
     // The cache is refreshed by every request, so it only ages between turns.
     const remaining = isRunning(current)
@@ -1352,11 +1394,12 @@ export const register: Register = on => {
       return (
         <Box flexDirection="column">
           <Text color={isRunning(current) ? 'suggestion' : 'success'}>
-            {progressReading(current, tasks, calls)}
+            {progressReading(current, tasks, calls) + range}
           </Text>
-          {rows.map(row => (
-            <Text dimColor>{rowReading(row)}</Text>
+          {shown.map(each => (
+            <Text dimColor>{rowReading(each.row, each.number)}</Text>
           ))}
+          {pager}
           <Text wrap="wrap">
             {[host, ...chips.map(chip => chip.label), elapsed ?? '']
               .filter(part => part !== '')
@@ -1398,6 +1441,10 @@ export const register: Register = on => {
 
     const { Svg } = $.ui.resolve(e)
     const patch = PATCH === '' ? {} : { backgroundColor: PATCH }
+    const running = isRunning(current)
+    const spent = (journal.spans ?? []).reduce((sum, span) => sum + span, 0)
+    // The pager's two buttons take their room from the summary.
+    const summaryWidth = PROGRESS_WIDTH - (pager === null ? 0 : 76)
     const hostChip: Chip = { icon: isLocal ? 'laptop' : 'cloud', label: '' }
 
     return (
@@ -1414,18 +1461,45 @@ export const register: Register = on => {
         paddingLeft={1}
         paddingRight={1}
       >
-        <Box flexDirection="row" alignItems="flex-start" columnGap={1}>
+        <Box flexDirection="row" alignItems="center" columnGap={1}>
           <Svg
-            source={progressSvg(current, tasks, calls, rows, journal.spans ?? [], time, began === null || time <= 0 ? null : time - began)}
-            alt={[progressReading(current, tasks, calls)]
-              .concat(rows.map(rowReading))
-              .concat(elapsed === null ? [] : [`Current session time ${elapsed}`])
+            source={progressSvg(
+              current,
+              tasks,
+              calls,
+              journal.spans ?? [],
+              time,
+              began === null || time <= 0 ? null : time - began,
+              summaryWidth,
+              range,
+            )}
+            alt={[progressReading(current, tasks, calls) + range]
+              .concat(elapsed === null ? [] : [`Conversation time ${elapsed}`])
               .join('; ')}
-            width={PROGRESS_WIDTH}
-            height={progressHeight(rows)}
+            width={summaryWidth}
+            height={ROW_HEIGHT}
             isInteractive
           />
+          {pager === null ? null : <Box {...patch}>{pager}</Box>}
         </Box>
+        {shown.map(each =>
+          each.row.endedAt === null ? (
+            <Svg
+              source={rowSvg(each.row, each.number, time, running, spent)}
+              alt={rowReading(each.row, each.number)}
+              width={PROGRESS_WIDTH}
+              height={ROW_HEIGHT}
+              isInteractive
+            />
+          ) : (
+            <Svg
+              source={rowSvg(each.row, each.number, time, running, spent)}
+              alt={rowReading(each.row, each.number)}
+              width={PROGRESS_WIDTH}
+              height={ROW_HEIGHT}
+            />
+          ),
+        )}
         <Svg source={RULE} alt="divider" height={RULE_HEIGHT} />
         <Box flexDirection="row" flexWrap="wrap" columnGap={1}>
           <Svg
@@ -1443,7 +1517,6 @@ export const register: Register = on => {
                 alt={chip.label === '' ? 'No worktree' : chip.label}
                 width={chipWidth(chip)}
                 height={CHIP_HEIGHT}
-                isInteractive
               />,
               text === undefined ? null : (
                 // A muted patch, since the app styles its button for its own
@@ -1470,7 +1543,6 @@ export const register: Register = on => {
                 alt={`${bar.label}: ${meterReading(bar)}`}
                 width={meterWidth(bar)}
                 height={METER_HEIGHT}
-                isInteractive
               />
               {left === null ? null : (
                 <Svg
