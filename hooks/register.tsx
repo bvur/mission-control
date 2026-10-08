@@ -253,7 +253,7 @@ const ICONS = {
     '<circle cx="12" cy="12" r="3"/><line x1="3" x2="9" y1="12" y2="12"/><line x1="15" x2="21" y1="12" y2="12"/>',
 }
 
-// Longer names are cut on the chip; its copy button still gives all of it.
+// Longer names are cut on the chip.
 const CHIP_LETTERS = 42
 // Clear room under a chip, so chips that wrap onto a second line do not touch.
 const CHIP_GAP = 6
@@ -262,8 +262,6 @@ type Chip = {
   icon: keyof typeof ICONS
   label: string
   isUnset?: boolean
-  // What the copy button beside the chip puts on the clipboard.
-  copy?: string
 }
 
 function chipWidth(chip: Chip): number {
@@ -1028,21 +1026,6 @@ async function report($: EngineInterface, text: string): Promise<void> {
   await attempt(async () => $.ui.toast(text), undefined)
 }
 
-async function copyText(
-  $: EngineInterface,
-  text: string,
-  surface: 'terminal' | 'desktop' | 'vscode' | 'mobile',
-): Promise<void> {
-  const copied = await attempt(
-    () => $.ui.copy({ text, surface }),
-    null,
-  )
-  await report(
-    $,
-    copied?.isCopied === true ? `Copied ${text}` : 'Could not copy it.',
-  )
-}
-
 async function pickTheme($: EngineInterface, name: string): Promise<void> {
   if (THEMES[name] === undefined) return
   await update($, theme, () => name)
@@ -1053,6 +1036,23 @@ async function pickTheme($: EngineInterface, name: string): Promise<void> {
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     const started = await next(e)
+    await attempt(
+      () =>
+        $.command.register({
+          name: 'mc-theme',
+          description: `Set the panel's theme: ${Object.keys(THEMES).join(', ')}`,
+        }),
+      undefined,
+    )
+    await attempt(
+      () =>
+        $.command.register({
+          name: 'mc-steps',
+          description:
+            "Page the panel's step list: earlier, later or latest",
+        }),
+      undefined,
+    )
     const saved = await attempt(() => $.store.get('theme'), undefined)
     if (typeof saved === 'string' && THEMES[saved] !== undefined) {
       await update($, theme, () => saved)
@@ -1066,6 +1066,41 @@ export const register: Register = on => {
     }
 
     return started
+  })
+
+  on('command.run', { command: 'mc-theme' }, async ($, e) => {
+    const names = Object.keys(THEMES)
+    const asked = e.args.trim().toLowerCase()
+    const name = names.find(each => each.toLowerCase() === asked)
+    if (name === undefined) {
+      return {
+        text: `Themes: ${names.join(', ')}. Now: ${await read($, theme)}. Type /mc-theme and a name.`,
+      }
+    }
+    await pickTheme($, name)
+
+    return { text: `Panel theme: ${name}.` }
+  })
+
+  on('command.run', { command: 'mc-steps' }, async ($, e) => {
+    const asked = e.args.trim().toLowerCase()
+    const most = Math.max(0, (await read($, log)).rows.length - ROW_COUNT)
+    const page = ROW_COUNT - 1
+    await update($, scroll, back =>
+      asked.startsWith('e')
+        ? Math.min(most, back + page)
+        : asked.startsWith('later')
+          ? Math.max(0, back - page)
+          : 0,
+    )
+
+    return {
+      text: asked.startsWith('e')
+        ? 'Showing earlier steps.'
+        : asked.startsWith('later')
+          ? 'Showing later steps.'
+          : 'Showing the latest steps. Type /mc-steps earlier or /mc-steps later to page.',
+    }
   })
 
   on('session.measure', async ($, e, next) => {
@@ -1252,15 +1287,7 @@ export const register: Register = on => {
             },
           ],
     )
-    const { Box, Button, Select, Text } = $.ui.resolve(e)
-    const themeSelect = (
-      <Select
-        key="theme"
-        options={Object.keys(THEMES).map(name => ({ value: name }))}
-        value={look}
-        onSelect={value => pickTheme($, value)}
-      />
-    )
+    const { Box, Button, Text } = $.ui.resolve(e)
     const began = await read($, startedAt)
     const time = await attempt(() => $.clock.now(), 0)
     const isLocal = where.runsOn !== 'Cloud'
@@ -1285,9 +1312,8 @@ export const register: Register = on => {
       {
         icon: 'tag',
         label: name ?? '(not named yet)',
-        ...(name === null ? {} : { copy: name }),
       },
-      { icon: 'folder', label: lastFolders(where.cwd, 2), copy: where.cwd },
+      { icon: 'folder', label: lastFolders(where.cwd, 2) },
       ...where.dirs.map(
         (dir): Chip => ({
           icon: 'folderPlus',
@@ -1298,7 +1324,6 @@ export const register: Register = on => {
         icon: 'branch',
         label: hasWorktree ? worktreeLabel : '',
         isUnset: !hasWorktree,
-        ...(branch === '' ? {} : { copy: branch }),
       },
       ...(status === ''
         ? []
@@ -1343,26 +1368,7 @@ export const register: Register = on => {
     const range =
       most === 0
         ? ''
-        : ` · steps ${shown[0]?.number ?? 0}–${shown.at(-1)?.number ?? 0} of ${numberOf(rows.at(-1) as Entry, rows.length - 1)}`
-    const pager =
-      most === 0
-        ? []
-        : [
-            <Button
-              key="older"
-              label="▲"
-              onPress={() =>
-                update($, scroll, () => Math.min(most, back + ROW_COUNT - 1))
-              }
-            />,
-            <Button
-              key="newer"
-              label="▼"
-              onPress={() =>
-                update($, scroll, () => Math.max(0, back - (ROW_COUNT - 1)))
-              }
-            />,
-          ]
+        : ` · /mc-steps · steps ${shown[0]?.number ?? 0}–${shown.at(-1)?.number ?? 0} of ${numberOf(rows.at(-1) as Entry, rows.length - 1)}`
     const isTerminal = surface === 'terminal'
     // The cache is refreshed by every request, so it only ages between turns.
     const remaining = isRunning(current)
@@ -1370,33 +1376,6 @@ export const register: Register = on => {
       : current.endedAt === null
         ? undefined
         : CACHE_MINUTES * 60_000 - (time - current.endedAt)
-    // The terminal's controls, worded; the desktop's sit inside the panel.
-    const buttons = (
-      <Box flexDirection="row" flexWrap="wrap" columnGap={1}>
-        {name === null ? null : (
-          <Button
-            key="copy-name"
-            label="Copy name"
-            onPress={() => copyText($, name, surface)}
-          />
-        )}
-        <Button
-          key="copy"
-          label="Copy path"
-          onPress={() => copyText($, where.cwd, surface)}
-        />
-        {branch === '' ? null : (
-          <Button
-            key="copy-branch"
-            label="Copy branch"
-            onPress={() => copyText($, branch, surface)}
-          />
-        )}
-        <Button key="compact" label="Compact" onPress={() => compact($)} />
-        {pager}
-      </Box>
-    )
-
     if (isTerminal) {
       const barColumns = Math.max(
         10,
@@ -1444,8 +1423,7 @@ export const register: Register = on => {
               </Box>
             )
           })}
-          {buttons}
-          {themeSelect}
+          <Button key="compact" label="Compact" onPress={() => compact($)} />
         </Box>
       )
     }
@@ -1455,8 +1433,6 @@ export const register: Register = on => {
     // own background, not the panel's.
     const patch = PATCH === '' ? {} : { backgroundColor: PATCH }
     const running = isRunning(current)
-    // The paging buttons take their room from the summary.
-    const summaryWidth = PROGRESS_WIDTH - (pager.length === 0 ? 0 : 76)
     const spent = (journal.spans ?? []).reduce((sum, span) => sum + span, 0)
     const hostChip: Chip = { icon: isLocal ? 'laptop' : 'cloud', label: '' }
 
@@ -1483,38 +1459,26 @@ export const register: Register = on => {
               journal.spans ?? [],
               time,
               began === null || time <= 0 ? null : time - began,
-              summaryWidth,
+              PROGRESS_WIDTH,
               range,
             )}
             alt={[progressReading(current, tasks, calls) + range]
               .concat(elapsed === null ? [] : [`Conversation time ${elapsed}`])
               .join('; ')}
-            width={summaryWidth}
+            width={PROGRESS_WIDTH}
             height={ROW_HEIGHT}
             isInteractive
           />
-          {pager.map(button => (
-            <Box {...patch}>{button}</Box>
-          ))}
         </Box>
-        {shown.map(each =>
-          each.row.endedAt === null ? (
-            <Svg
-              source={rowSvg(each.row, each.number, time, running, spent)}
-              alt={rowReading(each.row, each.number)}
-              width={PROGRESS_WIDTH}
-              height={ROW_HEIGHT}
-              isInteractive
-            />
-          ) : (
-            <Svg
-              source={rowSvg(each.row, each.number, time, running, spent)}
-              alt={rowReading(each.row, each.number)}
-              width={PROGRESS_WIDTH}
-              height={ROW_HEIGHT}
-            />
-          ),
-        )}
+        {shown.map(each => (
+          <Svg
+            source={rowSvg(each.row, each.number, time, running, spent)}
+            alt={rowReading(each.row, each.number)}
+            width={PROGRESS_WIDTH}
+            height={ROW_HEIGHT}
+            isInteractive
+          />
+        ))}
         <Svg source={RULE} alt="divider" height={RULE_HEIGHT} />
         <Box flexDirection="row" flexWrap="wrap" columnGap={1}>
           <Svg
@@ -1523,27 +1487,15 @@ export const register: Register = on => {
             width={chipWidth(hostChip)}
             height={CHIP_HEIGHT + CHIP_GAP}
           />
-          {chips.flatMap(chip => {
-            const text = chip.copy
-
-            return [
-              <Svg
-                source={chipSvg(chip)}
-                alt={chip.label === '' ? 'No worktree' : chip.label}
-                width={chipWidth(chip)}
-                height={CHIP_HEIGHT + CHIP_GAP}
-              />,
-              text === undefined ? null : (
-                <Box {...patch}>
-                  <Button
-                    key={`copy-${chip.icon}`}
-                    label="⧉"
-                    onPress={() => copyText($, text, surface)}
-                  />
-                </Box>
-              ),
-            ]
-          })}
+          {chips.map(chip => (
+            <Svg
+              source={chipSvg(chip)}
+              alt={chip.label === '' ? 'No worktree' : chip.label}
+              width={chipWidth(chip)}
+              height={CHIP_HEIGHT + CHIP_GAP}
+              isInteractive
+            />
+          ))}
         </Box>
         <Box flexDirection="column">
           {bars.map((bar, index) => {
@@ -1556,6 +1508,7 @@ export const register: Register = on => {
                 alt={`${bar.label}: ${meterReading(bar)}`}
                 width={meterWidth(bar)}
                 height={METER_HEIGHT}
+                isInteractive
               />
               {left === null ? null : (
                 <Svg
@@ -1583,10 +1536,6 @@ export const register: Register = on => {
                   height={SIDE_HEIGHT}
                   isInteractive
                 />
-              ) : null}
-              {index === bars.length - 1 ? <Box flexGrow={1} /> : null}
-              {index === bars.length - 1 ? (
-                <Box {...patch}>{themeSelect}</Box>
               ) : null}
             </Box>
             )
