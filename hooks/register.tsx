@@ -241,6 +241,8 @@ const ICONS = {
   laptop:
     '<path d="M20 16V7a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v9m16 0H4m16 0 1.28 2.55a1 1 0 0 1-.9 1.45H3.62a1 1 0 0 1-.9-1.45L4 16"/>',
   cloud: '<path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/>',
+  folderPlus:
+    '<path d="M12 10v6"/><path d="M9 13h6"/><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/>',
   folder:
     '<path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/>',
   branch:
@@ -934,9 +936,9 @@ async function describeGit($: EngineInterface, cwd: string): Promise<string> {
   const [ahead = '', behind = ''] = find('branch.ab').split(' ')
   const parts = [
     find('branch.head'),
-    changed === 0 ? 'clean' : `${changed} changed`,
-    Number(ahead) > 0 ? `↑${Number(ahead)}` : '',
-    Number(behind) < 0 ? `↓${-Number(behind)}` : '',
+    changed === 0 ? 'no changes' : `${changed} changed`,
+    Number(ahead) > 0 ? `${Number(ahead)} to push` : '',
+    Number(behind) < 0 ? `${-Number(behind)} to pull` : '',
   ]
 
   return parts.filter(part => part !== '').join(' · ')
@@ -1254,7 +1256,6 @@ export const register: Register = on => {
     const themeSelect = (
       <Select
         key="theme"
-        label="Theme"
         options={Object.keys(THEMES).map(name => ({ value: name }))}
         value={look}
         onSelect={value => pickTheme($, value)}
@@ -1269,6 +1270,12 @@ export const register: Register = on => {
       ? (where.worktree.split(' · ').at(-1) ?? '')
       : ''
     const surface = e.surface
+    // Each part says what it is: "worktree app-wt · branch main".
+    const treeParts = where.worktree.split(' · ')
+    const worktreeLabel =
+      treeParts.length > 1
+        ? `worktree ${treeParts[0]} · branch ${treeParts.slice(1).join(' · ')}`
+        : `branch ${where.worktree}`
     // The branch is on the chip before, so the git chip does not repeat it.
     const status =
       branch !== '' && where.git.startsWith(`${branch} · `)
@@ -1282,11 +1289,14 @@ export const register: Register = on => {
       },
       { icon: 'folder', label: lastFolders(where.cwd, 2), copy: where.cwd },
       ...where.dirs.map(
-        (dir): Chip => ({ icon: 'folder', label: lastFolders(dir, 2) }),
+        (dir): Chip => ({
+          icon: 'folderPlus',
+          label: `also ${lastFolders(dir, 2)}`,
+        }),
       ),
       {
         icon: 'branch',
-        label: hasWorktree ? where.worktree : '',
+        label: hasWorktree ? worktreeLabel : '',
         isUnset: !hasWorktree,
         ...(branch === '' ? {} : { copy: branch }),
       },

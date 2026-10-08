@@ -91,8 +91,8 @@ test('the band shows the session and its meters', async ($, on) => {
     const shown = [
       'Fix the login flow',
       '…/apps/shop',
-      '…/work/lib',
-      'app-wt · feature/login',
+      'also …/work/lib',
+      'worktree app-wt · branch feature/login',
       '1:30:00',
       '14% used',
       '1:00:00 left',
@@ -101,7 +101,7 @@ test('the band shows the session and its meters', async ($, on) => {
       'Ready',
       '1. [✓] Read · notes.md',
       '0:00:00',
-      '1 changed · ↑2',
+      '1 changed · 2 to push',
     ]
     for (const text of shown) expect(drawn).toContain(text)
     expect(drawn).not.toContain('Users')
