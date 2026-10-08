@@ -252,7 +252,9 @@ const ICONS = {
 }
 
 // Longer names are cut on the chip; its copy button still gives all of it.
-const CHIP_LETTERS = 36
+const CHIP_LETTERS = 42
+// Clear room under a chip, so chips that wrap onto a second line do not touch.
+const CHIP_GAP = 6
 
 type Chip = {
   icon: keyof typeof ICONS
@@ -274,7 +276,7 @@ function chipSvg(chip: Chip): string {
   const ink = chip.isUnset ? ' fill-opacity="0.7" font-style="italic"' : ''
 
   return (
-    `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${CHIP_HEIGHT}" viewBox="0 0 ${width} ${CHIP_HEIGHT}">${STYLE}${backdrop(width, CHIP_HEIGHT)}` +
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${CHIP_HEIGHT + CHIP_GAP}" viewBox="0 0 ${width} ${CHIP_HEIGHT + CHIP_GAP}">${STYLE}${backdrop(width, CHIP_HEIGHT + CHIP_GAP)}` +
     `<rect x="0.5" y="0.5" width="${width - 1}" height="${CHIP_HEIGHT - 1}" rx="6" fill="${INSET}" class="b" stroke="${LINE}"${frame}/>` +
     `<g transform="translate(8 4) scale(0.5833)" fill="none" class="s" stroke="${INK}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICONS[chip.icon]}</g>` +
     `<text x="28" y="15" font-family="${FONT}" font-size="${FONT_SIZE}" fill="${INK}"${ink}>${escapeXml(shorten(chip.label, CHIP_LETTERS))}</text>` +
@@ -1270,6 +1272,11 @@ export const register: Register = on => {
       ? (where.worktree.split(' · ').at(-1) ?? '')
       : ''
     const surface = e.surface
+    // The branch is on the chip before, so the git chip does not repeat it.
+    const status =
+      branch !== '' && where.git.startsWith(`${branch} · `)
+        ? where.git.slice(branch.length + 3)
+        : where.git
     const chips: Chip[] = [
       {
         icon: 'tag',
@@ -1286,9 +1293,9 @@ export const register: Register = on => {
         isUnset: !hasWorktree,
         ...(branch === '' ? {} : { copy: branch }),
       },
-      ...(where.git === ''
+      ...(status === ''
         ? []
-        : [{ icon: 'commit', label: where.git } satisfies Chip]),
+        : [{ icon: 'commit', label: status } satisfies Chip]),
     ]
     const elapsed =
       began !== null && time > 0 ? formatElapsed(time - began) : null
@@ -1506,7 +1513,7 @@ export const register: Register = on => {
             source={chipSvg(hostChip)}
             alt={host}
             width={chipWidth(hostChip)}
-            height={CHIP_HEIGHT}
+            height={CHIP_HEIGHT + CHIP_GAP}
           />
           {chips.flatMap(chip => {
             const text = chip.copy
@@ -1516,7 +1523,7 @@ export const register: Register = on => {
                 source={chipSvg(chip)}
                 alt={chip.label === '' ? 'No worktree' : chip.label}
                 width={chipWidth(chip)}
-                height={CHIP_HEIGHT}
+                height={CHIP_HEIGHT + CHIP_GAP}
               />,
               text === undefined ? null : (
                 // A muted patch, since the app styles its button for its own
