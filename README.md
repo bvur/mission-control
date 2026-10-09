@@ -3,7 +3,9 @@
 A Claude Code plugin that draws a panel above the prompt, showing what the
 session is doing and what it is costing.
 
-![The mission-control panel in the Forest theme](docs/themes/forest.png)
+![The mission-control panel during a turn, in the Slate theme](docs/demo.gif)
+
+Announced [on X](https://x.com/b0rv0r/status/2108347535567835520).
 
 ## What it shows
 
