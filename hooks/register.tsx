@@ -930,6 +930,9 @@ async function describeHost($: EngineInterface): Promise<string> {
   return isCloud ? 'Cloud' : 'Local'
 }
 
+// How git itself names a detached HEAD in `status --branch`.
+const DETACHED = '(detached)'
+
 async function describeWorktree(
   $: EngineInterface,
   cwd: string,
@@ -962,9 +965,13 @@ async function describeWorktree(
   )
   const branch = head?.exitCode === 0 ? head.stdout.trim() : ''
   const tree = gitDir === commonDir ? '' : baseName(top)
-  const parts = [tree, branch].filter(part => part !== '')
+  // No current branch means a detached HEAD; say so, or a lone worktree name
+  // would read as the branch.
+  const parts = [tree, branch === '' ? DETACHED : branch].filter(
+    part => part !== '',
+  )
 
-  return parts.length > 0 ? parts.join(' · ') : 'no worktree'
+  return parts.join(' · ')
 }
 
 // The branch, how many files differ, and how far it is from its upstream.
@@ -1064,6 +1071,14 @@ async function refreshPlace($: EngineInterface): Promise<string> {
   await update($, place, () => next)
 
   return root
+}
+
+// The place is read again when a turn ends; this reads it on demand, for a
+// branch or a name changed outside the session.
+async function refresh($: EngineInterface): Promise<void> {
+  const root = await refreshPlace($)
+  await readTitle($, root)
+  await report($, 'Refreshed')
 }
 
 async function compact($: EngineInterface): Promise<void> {
@@ -1316,20 +1331,25 @@ export const register: Register = on => {
     const isLocal = where.runsOn !== 'Cloud'
     const host = isLocal ? 'Local' : 'Cloud'
     const hasWorktree = where.worktree !== 'no worktree'
-    const branch = hasWorktree
+    const head = hasWorktree
       ? (where.worktree.split(' · ').at(-1) ?? '')
       : ''
+    const isDetached = head === DETACHED
+    const branch = isDetached ? '' : head
     const surface = e.surface
     // Each part says what it is: "worktree app-wt · branch main".
     const treeParts = where.worktree.split(' · ')
+    const headLabel = isDetached
+      ? 'detached'
+      : `branch ${treeParts.slice(treeParts.length > 1 ? 1 : 0).join(' · ')}`
     const worktreeLabel =
       treeParts.length > 1
-        ? `worktree ${treeParts[0]} · branch ${treeParts.slice(1).join(' · ')}`
-        : `branch ${where.worktree}`
+        ? `worktree ${treeParts[0]} · ${headLabel}`
+        : headLabel
     // The branch is on the chip before, so the git chip does not repeat it.
     const status =
-      branch !== '' && where.git.startsWith(`${branch} · `)
-        ? where.git.slice(branch.length + 3)
+      head !== '' && where.git.startsWith(`${head} · `)
+        ? where.git.slice(head.length + 3)
         : where.git
     const chips: Chip[] = [
       {
@@ -1442,6 +1462,7 @@ export const register: Register = on => {
             onPress={() => copyText($, branch, surface)}
           />
         )}
+        <Button key="refresh" label="Refresh" onPress={() => refresh($)} />
         <Button key="compact" label="Compact" onPress={() => compact($)} />
         {pager}
       </Box>
@@ -1640,6 +1661,9 @@ export const register: Register = on => {
               ),
             ]
           })}
+          <Box {...patch}>
+            <Button key="refresh" label="↻" onPress={() => refresh($)} />
+          </Box>
         </Box>
         <Box flexDirection="column">
           {bars.map((bar, index) => {
